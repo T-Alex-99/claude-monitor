@@ -155,13 +155,21 @@
             font-weight: 500;
         }
 
-        .process-table .dir {
+        .process-table .name a {
             color: var(--text-secondary);
-            font-size: 12px;
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            text-decoration: none;
+            margin-left: 8px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .process-table .name a:hover {
+            opacity: 1;
+        }
+
+        .process-table .uptime {
+            color: var(--text-secondary);
+            font-size: 13px;
         }
 
         .process-table .cpu,
@@ -357,6 +365,7 @@
             </h1>
             <div class="header-right">
                 <div class="temp-display" id="tempDisplay">-- °C</div>
+                <button class="settings-btn" id="testNotifBtn" onclick="testNotification()" title="Test notifications">🔔 Test</button>
                 <button class="settings-btn" id="settingsBtn" title="Settings">⚙️</button>
             </div>
         </header>
@@ -369,7 +378,7 @@
                         <tr>
                             <th>PID</th>
                             <th>Name</th>
-                            <th>Working Directory</th>
+                            <th>Running</th>
                             <th style="text-align: right;">CPU %</th>
                             <th style="text-align: right;">Memory</th>
                             <th></th>
@@ -523,8 +532,8 @@
                 tbody.innerHTML = processes.map(p => `
                     <tr>
                         <td class="pid">${p.pid}</td>
-                        <td class="name">${escapeHtml(p.name)}</td>
-                        <td class="dir" title="${escapeHtml(p.workingDir)}">${escapeHtml(p.workingDir)}</td>
+                        <td class="name">${escapeHtml(p.name)}<a href="#" onclick="openFolder('${escapeHtml(p.workingDir)}'); return false;" title="${escapeHtml(p.workingDir)}">📁</a></td>
+                        <td class="uptime">${formatUptime(p.startTime)}</td>
                         <td class="cpu ${p.cpuPercent >= settings.cpuThreshold ? 'high' : ''}">${p.cpuPercent.toFixed(1)}%</td>
                         <td class="mem">${p.memoryMb.toFixed(0)} MB</td>
                         <td><button class="kill-btn" onclick="killProcess(${p.pid}, '${escapeHtml(p.name)}')">Kill</button></td>
@@ -675,13 +684,58 @@
             lastAlertTime = now;
 
             if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('Claude Monitor Alert', { body: message, icon: '🔥' });
+                new Notification('Claude Monitor Alert', {
+                    body: message,
+                    tag: 'claude-monitor',
+                    requireInteraction: false
+                });
             }
+        }
+
+        function testNotification() {
+            if (!('Notification' in window)) {
+                alert('Browser does not support notifications');
+                return;
+            }
+
+            if (Notification.permission === 'denied') {
+                alert('Notifications are blocked. Please enable in browser settings.');
+                return;
+            }
+
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('Claude Monitor', { body: 'Notifications enabled!' });
+                    }
+                });
+                return;
+            }
+
+            new Notification('Claude Monitor Test', { body: 'Notifications are working!' });
         }
 
         async function requestNotificationPermission() {
             if ('Notification' in window && Notification.permission === 'default') {
-                await Notification.requestPermission();
+                const permission = await Notification.requestPermission();
+                updateNotificationStatus();
+            }
+            updateNotificationStatus();
+        }
+
+        function updateNotificationStatus() {
+            const btn = document.getElementById('testNotifBtn');
+            if (!btn) return;
+
+            if (!('Notification' in window)) {
+                btn.textContent = '🔕 Not supported';
+                btn.disabled = true;
+            } else if (Notification.permission === 'granted') {
+                btn.textContent = '🔔 Test';
+            } else if (Notification.permission === 'denied') {
+                btn.textContent = '🔕 Blocked';
+            } else {
+                btn.textContent = '🔔 Enable';
             }
         }
 
@@ -690,6 +744,34 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function openFolder(path) {
+            navigator.clipboard.writeText(path).then(() => {
+                // Show brief tooltip
+                const tooltip = document.createElement('div');
+                tooltip.textContent = 'Path copied!';
+                tooltip.style.cssText = 'position:fixed;top:20px;right:20px;background:#4ade80;color:#000;padding:8px 16px;border-radius:6px;z-index:9999;';
+                document.body.appendChild(tooltip);
+                setTimeout(() => tooltip.remove(), 2000);
+            });
+        }
+
+        function formatUptime(startTime) {
+            if (!startTime) return '-';
+            const now = Math.floor(Date.now() / 1000);
+            const seconds = now - startTime;
+
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+            if (seconds < 86400) {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                return `${h}h ${m}m`;
+            }
+            const d = Math.floor(seconds / 86400);
+            const h = Math.floor((seconds % 86400) / 3600);
+            return `${d}d ${h}h`;
         }
 
         function updateLastUpdate() {
@@ -721,6 +803,7 @@
             initCharts();
             await loadSettings();
             await requestNotificationPermission();
+            updateNotificationStatus();
 
             // Initial update
             await Promise.all([
