@@ -365,7 +365,6 @@
             </h1>
             <div class="header-right">
                 <div class="temp-display" id="tempDisplay">-- °C</div>
-                <button class="settings-btn" id="testNotifBtn" onclick="testNotification()" title="Test notifications">🔔 Test</button>
                 <button class="settings-btn" id="settingsBtn" title="Settings">⚙️</button>
             </div>
         </header>
@@ -692,50 +691,9 @@
             }
         }
 
-        function testNotification() {
-            if (!('Notification' in window)) {
-                alert('Browser does not support notifications');
-                return;
-            }
-
-            if (Notification.permission === 'denied') {
-                alert('Notifications are blocked. Please enable in browser settings.');
-                return;
-            }
-
-            if (Notification.permission === 'default') {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        new Notification('Claude Monitor', { body: 'Notifications enabled!' });
-                    }
-                });
-                return;
-            }
-
-            new Notification('Claude Monitor Test', { body: 'Notifications are working!' });
-        }
-
         async function requestNotificationPermission() {
             if ('Notification' in window && Notification.permission === 'default') {
-                const permission = await Notification.requestPermission();
-                updateNotificationStatus();
-            }
-            updateNotificationStatus();
-        }
-
-        function updateNotificationStatus() {
-            const btn = document.getElementById('testNotifBtn');
-            if (!btn) return;
-
-            if (!('Notification' in window)) {
-                btn.textContent = '🔕 Not supported';
-                btn.disabled = true;
-            } else if (Notification.permission === 'granted') {
-                btn.textContent = '🔔 Test';
-            } else if (Notification.permission === 'denied') {
-                btn.textContent = '🔕 Blocked';
-            } else {
-                btn.textContent = '🔔 Enable';
+                await Notification.requestPermission();
             }
         }
 
@@ -803,7 +761,6 @@
             initCharts();
             await loadSettings();
             await requestNotificationPermission();
-            updateNotificationStatus();
 
             // Initial update
             await Promise.all([

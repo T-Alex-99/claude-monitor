@@ -34,12 +34,18 @@ func main() {
 	// Register API routes
 	handler.RegisterRoutes(mux)
 
-	// Serve static files
+	// Serve static files with no-cache headers
 	subFS, err := fs.Sub(staticFS, "static")
 	if err != nil {
 		log.Fatalf("Failed to create static file system: %v", err)
 	}
-	mux.Handle("/", http.FileServer(http.FS(subFS)))
+	fileServer := http.FileServer(http.FS(subFS))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		fileServer.ServeHTTP(w, r)
+	})
 
 	// Start background polling
 	go func() {
