@@ -4,7 +4,7 @@ Lightweight web dashboard to monitor Claude CLI processes.
 
 ## Features
 
-- **Process List** - View all running Claude CLI instances with CPU%, RAM, and working directory
+- **Process List** - View all running Claude CLI instances with CPU%, RAM, and uptime
 - **Smart Naming** - Processes named after their working folder (e.g., "my-project", "my-project (2nd)")
 - **Kill Button** - Terminate runaway processes with one click
 - **Temperature** - Real-time CPU temperature display
@@ -16,9 +16,30 @@ Lightweight web dashboard to monitor Claude CLI processes.
 
 - Linux (uses `/proc` filesystem)
 - Go 1.21+
-- `lm-sensors` for temperature readings (optional)
+- `lm-sensors` for temperature readings (optional but recommended)
 
 ## Installation
+
+### Step 1: Install Go (if not installed)
+
+```bash
+sudo apt update
+sudo apt install golang-go
+```
+
+Verify installation:
+```bash
+go version
+```
+
+### Step 2: Install lm-sensors (optional, for temperature)
+
+```bash
+sudo apt install lm-sensors
+sudo sensors-detect --auto
+```
+
+### Step 3: Clone and build
 
 ```bash
 git clone https://github.com/T-Alex-99/claude-monitor.git
@@ -26,14 +47,20 @@ cd claude-monitor
 go build -o claude-monitor .
 ```
 
+### Step 4: Run
+
+```bash
+./claude-monitor
+```
+
+Open http://localhost:8080 in your browser.
+
 ## Usage
 
 ```bash
 ./claude-monitor              # Start on default port 8080
 ./claude-monitor -port 3000   # Start on custom port
 ```
-
-Then open http://localhost:8080
 
 ## API Endpoints
 
