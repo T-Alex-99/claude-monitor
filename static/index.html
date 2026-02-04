@@ -706,7 +706,6 @@
 
         function openFolder(path) {
             navigator.clipboard.writeText(path).then(() => {
-                // Show brief tooltip
                 const tooltip = document.createElement('div');
                 tooltip.textContent = 'Path copied!';
                 tooltip.style.cssText = 'position:fixed;top:20px;right:20px;background:#4ade80;color:#000;padding:8px 16px;border-radius:6px;z-index:9999;';
