@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Process Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --accent: #e94560;
+            --accent-hover: #ff6b6b;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--bg-card);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h1 .icon {
+            font-size: 28px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .temp-display {
+            font-size: 20px;
+            font-weight: 600;
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border-radius: 8px;
+        }
+
+        .temp-display.warning {
+            background: var(--warning);
+            color: #000;
+        }
+
+        .temp-display.danger {
+            background: var(--danger);
+        }
+
+        .settings-btn {
+            background: var(--bg-card);
+            border: none;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+
+        .settings-btn:hover {
+            background: var(--accent);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card h2 {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .process-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .process-table th,
+        .process-table td {
+            padding: 12px 8px;
+            text-align: left;
+        }
+
+        .process-table th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--bg-card);
+        }
+
+        .process-table tr:not(:last-child) td {
+            border-bottom: 1px solid var(--bg-card);
+        }
+
+        .process-table .pid {
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .process-table .name {
+            font-weight: 500;
+        }
+
+        .process-table .dir {
+            color: var(--text-secondary);
+            font-size: 12px;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .process-table .cpu,
+        .process-table .mem {
+            font-family: monospace;
+            text-align: right;
+        }
+
+        .process-table .cpu.high {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .kill-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .kill-btn:hover {
+            background: #dc2626;
+        }
+
+        .kill-btn:disabled {
+            background: var(--bg-card);
+            cursor: not-allowed;
+        }
+
+        .no-processes {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Settings Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .form-group input[type="number"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-card);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 16px;
+        }
+
+        .form-group input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-group.checkbox {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .form-group.checkbox input {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+        }
+
+        .form-group.checkbox label {
+            margin-bottom: 0;
+            color: var(--text-primary);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-cancel {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .btn-save {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: var(--accent-hover);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <span class="icon">🔍</span>
+                Claude Process Monitor
+            </h1>
+            <div class="header-right">
+                <div class="temp-display" id="tempDisplay">-- °C</div>
+                <button class="settings-btn" id="settingsBtn" title="Settings">⚙️</button>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card full-width">
+                <h2>Active Claude Processes</h2>
+                <table class="process-table" id="processTable">
+                    <thead>
+                        <tr>
+                            <th>PID</th>
+                            <th>Name</th>
+                            <th>Working Directory</th>
+                            <th style="text-align: right;">CPU %</th>
+                            <th style="text-align: right;">Memory</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="processBody">
+                        <tr>
+                            <td colspan="6" class="no-processes">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>CPU History (30 min)</h2>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Temperature History (30 min)</h2>
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span>Monitoring active</span>
+            </div>
+            <span id="lastUpdate">Last update: --</span>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h2>Alert Settings</h2>
+            <div class="form-group checkbox">
+                <input type="checkbox" id="alertsEnabled" checked>
+                <label for="alertsEnabled">Enable browser notifications</label>
+            </div>
+            <div class="form-group">
+                <label for="cpuThreshold">CPU Alert Threshold (%)</label>
+                <input type="number" id="cpuThreshold" min="50" max="100" value="90">
+            </div>
+            <div class="form-group">
+                <label for="tempThreshold">Temperature Alert Threshold (°C)</label>
+                <input type="number" id="tempThreshold" min="60" max="100" value="85">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-cancel" id="cancelSettings">Cancel</button>
+                <button class="btn-save" id="saveSettings">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let settings = {
+            cpuThreshold: 90,
+            tempThreshold: 85,
+            alertsEnabled: true
+        };
+        let cpuChart, tempChart;
+        let lastAlertTime = 0;
+
+        // Initialize charts
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        display: true,
+                        ticks: {
+                            color: '#aaa',
+                            callback: function(value) {
+                                const mins = Math.abs(Math.round(value / 60));
+                                return mins === 0 ? 'now' : `-${mins}m`;
+                            }
+                        },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        min: 0,
+                        ticks: { color: '#aaa' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#eee' }
+                    }
+                }
+            };
+
+            cpuChart = new Chart(document.getElementById('cpuChart'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: { ...chartOptions.scales.y, max: 100, title: { display: true, text: 'CPU %', color: '#aaa' } }
+                    }
+                }
+            });
+
+            tempChart = new Chart(document.getElementById('tempChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Temperature',
+                        borderColor: '#e94560',
+                        backgroundColor: 'rgba(233, 69, 96, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        data: []
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: { ...chartOptions.scales.y, title: { display: true, text: '°C', color: '#aaa' } }
+                    }
+                }
+            });
+        }
+
+        // Fetch and update processes
+        async function updateProcesses() {
+            try {
+                const res = await fetch('/api/processes');
+                const processes = await res.json();
+
+                const tbody = document.getElementById('processBody');
+
+                if (!processes || processes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="no-processes">No Claude processes running</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = processes.map(p => `
+                    <tr>
+                        <td class="pid">${p.pid}</td>
+                        <td class="name">${escapeHtml(p.name)}</td>
+                        <td class="dir" title="${escapeHtml(p.workingDir)}">${escapeHtml(p.workingDir)}</td>
+                        <td class="cpu ${p.cpuPercent >= settings.cpuThreshold ? 'high' : ''}">${p.cpuPercent.toFixed(1)}%</td>
+                        <td class="mem">${p.memoryMb.toFixed(0)} MB</td>
+                        <td><button class="kill-btn" onclick="killProcess(${p.pid}, '${escapeHtml(p.name)}')">Kill</button></td>
+                    </tr>
+                `).join('');
+
+                // Check for CPU alerts
+                for (const p of processes) {
+                    if (p.cpuPercent >= settings.cpuThreshold) {
+                        triggerAlert(`High CPU: ${p.name} at ${p.cpuPercent.toFixed(1)}%`);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch processes:', err);
+            }
+        }
+
+        // Fetch and update temperature
+        async function updateTemperature() {
+            try {
+                const res = await fetch('/api/temperature');
+                const data = await res.json();
+
+                const tempEl = document.getElementById('tempDisplay');
+                const temp = data.mainTemp;
+
+                tempEl.textContent = `${temp.toFixed(0)} °C`;
+                tempEl.classList.remove('warning', 'danger');
+
+                if (temp >= settings.tempThreshold) {
+                    tempEl.classList.add('danger');
+                    triggerAlert(`High temperature: ${temp.toFixed(0)}°C`);
+                } else if (temp >= settings.tempThreshold - 10) {
+                    tempEl.classList.add('warning');
+                }
+            } catch (err) {
+                console.error('Failed to fetch temperature:', err);
+            }
+        }
+
+        // Fetch and update history
+        async function updateHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const history = await res.json();
+
+                if (!history || history.length === 0) return;
+
+                const now = Date.now() / 1000;
+
+                // Update temperature chart
+                tempChart.data.datasets[0].data = history.map(h => ({
+                    x: h.timestamp - now,
+                    y: h.temperature
+                }));
+                tempChart.update('none');
+
+                // Update CPU chart - aggregate by process name
+                const processData = {};
+                const colors = ['#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#34d399'];
+                let colorIdx = 0;
+
+                for (const h of history) {
+                    if (!h.processes) continue;
+                    for (const p of h.processes) {
+                        if (!processData[p.name]) {
+                            processData[p.name] = {
+                                label: p.name,
+                                borderColor: colors[colorIdx % colors.length],
+                                tension: 0.3,
+                                pointRadius: 0,
+                                data: []
+                            };
+                            colorIdx++;
+                        }
+                        processData[p.name].data.push({
+                            x: h.timestamp - now,
+                            y: p.cpuPercent
+                        });
+                    }
+                }
+
+                cpuChart.data.datasets = Object.values(processData);
+                cpuChart.update('none');
+            } catch (err) {
+                console.error('Failed to fetch history:', err);
+            }
+        }
+
+        // Kill process
+        async function killProcess(pid, name) {
+            if (!confirm(`Kill process "${name}" (PID ${pid})?`)) return;
+
+            try {
+                const res = await fetch(`/api/kill/${pid}`, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.success) {
+                    updateProcesses();
+                } else {
+                    alert('Failed to kill process');
+                }
+            } catch (err) {
+                alert('Error killing process: ' + err.message);
+            }
+        }
+
+        // Settings
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                settings = await res.json();
+
+                document.getElementById('alertsEnabled').checked = settings.alertsEnabled;
+                document.getElementById('cpuThreshold').value = settings.cpuThreshold;
+                document.getElementById('tempThreshold').value = settings.tempThreshold;
+            } catch (err) {
+                console.error('Failed to load settings:', err);
+            }
+        }
+
+        async function saveSettings() {
+            settings = {
+                alertsEnabled: document.getElementById('alertsEnabled').checked,
+                cpuThreshold: parseFloat(document.getElementById('cpuThreshold').value),
+                tempThreshold: parseFloat(document.getElementById('tempThreshold').value)
+            };
+
+            try {
+                await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+            } catch (err) {
+                console.error('Failed to save settings:', err);
+            }
+
+            document.getElementById('settingsModal').classList.remove('open');
+        }
+
+        // Notifications
+        function triggerAlert(message) {
+            if (!settings.alertsEnabled) return;
+
+            const now = Date.now();
+            if (now - lastAlertTime < 30000) return; // Rate limit: 30s
+            lastAlertTime = now;
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Claude Monitor Alert', { body: message, icon: '🔥' });
+            }
+        }
+
+        async function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                await Notification.requestPermission();
+            }
+        }
+
+        // Utility
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateLastUpdate() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent =
+                `Last update: ${now.toLocaleTimeString()}`;
+        }
+
+        // Event listeners
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            document.getElementById('settingsModal').classList.add('open');
+        });
+
+        document.getElementById('cancelSettings').addEventListener('click', () => {
+            document.getElementById('settingsModal').classList.remove('open');
+            loadSettings(); // Reset form
+        });
+
+        document.getElementById('saveSettings').addEventListener('click', saveSettings);
+
+        document.getElementById('settingsModal').addEventListener('click', (e) => {
+            if (e.target.id === 'settingsModal') {
+                document.getElementById('settingsModal').classList.remove('open');
+            }
+        });
+
+        // Initialize
+        async function init() {
+            initCharts();
+            await loadSettings();
+            await requestNotificationPermission();
+
+            // Initial update
+            await Promise.all([
+                updateProcesses(),
+                updateTemperature(),
+                updateHistory()
+            ]);
+            updateLastUpdate();
+
+            // Periodic updates
+            setInterval(async () => {
+                await Promise.all([
+                    updateProcesses(),
+                    updateTemperature(),
+                    updateHistory()
+                ]);
+                updateLastUpdate();
+            }, 5000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
